@@ -3,27 +3,28 @@
    an AWS virtual private cloud. The individual web server instances will be based on the Ubuntu 18.04 amazon machine
    image and the auto scaling group they form part of will span three availability zones */
 
+variable "whitelist" {
+  type = object({
+                  for_https = list(string) 
+		  for_ssh  = list(string)
+		})
+}
+variable "private_key_name" {
+  type = string
+}
+variable "min_web_instances" {
+  type = number
+}
+variable "max_web_instances" {
+  type = number
+}
+
 provider "aws" {
   profile = "default"
   region = "us-east-1"
 }
 
 data "aws_availability_zones" "all" {}
-
-/* Create EC2 instance
-resource "aws_instance" "ANDdig_https_server" {
-  ami                    = "${var.ec2_instance_props["image_id"]}"
-  count                  = 1 
-  key_name               = "${var.priv_key_props[key_name]}"
-  vpc_security_group_ids = ["${aws_security_group.ec2_sg.id}"]
-  source_dest_check      = false
-  instance_type          = "${var.ec2_instance_props["instance_type"]}"
-
-  tags {
-    function = "Web_Tier"
-  }
-}
-*/
 
 // Create the Security Group which will be used for the EC2 instances launched by the auto-scaling group
 resource "aws_security_group" "ec2_sg" {
@@ -33,23 +34,23 @@ resource "aws_security_group" "ec2_sg" {
     from_port   = 443 
     to_port     = 443 
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.whitelist[for_https] 
   }
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.whitelist[for_ssh] 
   }
 }
 
 // Create the Launch Configuration which will determine how new EC2 instances are launched
 resource "aws_launch_configuration" "ec2_lc" {
   name_prefix     = "web_tier_lc-"
-  image_id        = var.ec2_instance_props[image_id]
-  instance_type   = var.ec2_instance_props[instance_type]
+  image_id        = "ami-04b9e92b5572fa0d1"
+  instance_type   = "t2.nano" 
   security_groups = [aws_security_group.ec2_sg.id]
-  key_name        = var.priv_key_props[key_name]
+  key_name        = private_key_name
 
   // the following commands will run when an instance is bootstrapped
   user_data       = file("install_apache.sh")
@@ -63,9 +64,10 @@ resource "aws_launch_configuration" "ec2_lc" {
 resource "aws_autoscaling_group" "ec2_asg" {
   name		       = "ANDdig_WebTier-asg"
   launch_configuration = aws_launch_configuration.ec2_lc.id
-  availability_zones   = [var.ec2_asg_props.az_list]
-  min_size             = var.ec2_asg_props.min_size 
-  max_size             = var.ec2_asg_props.max_size 
+  availability_zones   = ["us-east-1a","us-east-1b","us-east-1c"]
+  vpc_zone_identifier  = [var.ec2_asg_props.zone_list]
+  min_size             = var.min_web_instances
+  max_size             = var.max_web_instances
   load_balancers       = aws_elb.elb_lb.name
   health_check_type    = "ELB"
 
@@ -90,7 +92,7 @@ resource "aws_security_group" "elb_sg" {
     from_port   = 443 
     to_port     = 443 
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
+    cidr_blocks = var.whitelist[for_https]
   }
 }
 
