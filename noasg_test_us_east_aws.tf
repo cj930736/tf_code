@@ -119,9 +119,12 @@ resource "aws_security_group" "ec2_sg" {
 }
 
 resource "aws_instance" "test_web_2a" {
-  ami 	        = "ami-06249d482a680ae8d"
-  instance_type = "t2.nano"
-  subnet_id     = aws_subnet.public_us_east_2a.id 
+
+  ami 	        	      = "ami-06249d482a680ae8d"
+  instance_type 	      = "t2.nano"
+  subnet_id     	      = aws_subnet.public_us_east_2a.id 
+  associate_public_ip_address = true
+  key_name 		      = "caj_key" 
 
   vpc_security_group_ids = [
     aws_security_group.ec2_sg.id
@@ -134,9 +137,12 @@ resource "aws_instance" "test_web_2a" {
 } 
 
 resource "aws_instance" "test_web_2b" {
-  ami 	        = "ami-06249d482a680ae8d"
-  instance_type = "t2.nano"
-  subnet_id     = aws_subnet.public_us_east_2b.id
+
+  ami 	         	      = "ami-06249d482a680ae8d"
+  instance_type 	      = "t2.nano"
+  subnet_id     	      = aws_subnet.public_us_east_2b.id
+  associate_public_ip_address = true
+  key_name 		      = "caj_key" 
 
   vpc_security_group_ids = [
     aws_security_group.ec2_sg.id
@@ -149,9 +155,12 @@ resource "aws_instance" "test_web_2b" {
 } 
 
 resource "aws_instance" "test_web_2c" {
-  ami 	        = "ami-06249d482a680ae8d"
-  instance_type = "t2.nano"
-  subnet_id     = aws_subnet.public_us_east_2c.id
+
+  ami 	        	      = "ami-06249d482a680ae8d"
+  instance_type 	      = "t2.nano"
+  subnet_id     	      = aws_subnet.public_us_east_2c.id
+  associate_public_ip_address = true
+  key_name 		      = "caj_key" 
 
   vpc_security_group_ids = [
     aws_security_group.ec2_sg.id
@@ -206,7 +215,7 @@ resource "aws_elb" "elb_lb" {
     unhealthy_threshold = 2
     timeout             = 3
     interval            = 30
-    target              = "HTTPS:80/"
+    target              = "HTTP:80/"
   }
 
   listener {
