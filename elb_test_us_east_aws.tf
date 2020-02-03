@@ -5,12 +5,9 @@
 
 variable "whitelist" {
   type = object({
-                  for_https = list(string) 
+                  for_http = list(string) 
 		  for_ssh  = list(string)
 		})
-}
-variable "private_key_name" {
-  type = string
 }
 variable "min_web_instances" {
   type = number
@@ -18,39 +15,122 @@ variable "min_web_instances" {
 variable "max_web_instances" {
   type = number
 }
+variable "availability_zones" {
+  type = list(string)
+}
 
 provider "aws" {
   profile = "default"
-  region = "us-east-1"
+  region = "us-east-2"
 }
 
-data "aws_availability_zones" "all" {}
+resource "aws_vpc" "my_vpc" {
+  cidr_block       = "172.32.0.0/16"
+  enable_dns_hostnames = true
+
+  tags = {
+    Name = "My VPC"
+  }
+}
+
+resource "aws_subnet" "public_us_east_2a" {
+  vpc_id     = aws_vpc.my_vpc.id
+  cidr_block = "172.32.0.0/28"
+  availability_zone = "us-east-2a"
+
+  tags = {
+    Name = "Public Subnet us-east-2a"
+  }
+}
+
+resource "aws_subnet" "public_us_east_2b" {
+  vpc_id     = aws_vpc.my_vpc.id
+  cidr_block = "172.32.1.0/28"
+  availability_zone = "us-east-2b"
+
+  tags = {
+    Name = "Public Subnet us-east-2b"
+  }
+}
+
+resource "aws_subnet" "public_us_east_2c" {
+  vpc_id     = aws_vpc.my_vpc.id
+  cidr_block = "172.32.2.0/28"
+  availability_zone = "us-east-2b"
+
+  tags = {
+    Name = "Public Subnet us-east-2c"
+  }
+}
+
+/*
+resource "aws_subnet" "default_1a" {
+  vpc_id     = aws_vpc.my_vpc.id
+  cidr_block = "172.32.3.0/28"
+  availability_zone = "us-east-2a"
+
+  tags = {
+    Name = "Public Subnet us-east-2a"
+  }
+}
+
+resource "aws_subnet" "default_1b" {
+  vpc_id     = aws_vpc.my_vpc.id
+  cidr_block = "172.32.4.0/28"
+  availability_zone = "us-east-2b"
+
+  tags = {
+    Name = "Public Subnet us-east-2b"
+  }
+}
+
+resource "aws_subnet" "default_1c" {
+  vpc_id     = aws_vpc.my_vpc.id
+  cidr_block = "172.32.5.0/28"
+  availability_zone = "us-east-2c"
+
+  tags = {
+    Name = "Public Subnet us-east-2c"
+  }
+}
+
+resource "aws_default_subnet" "default_1a" {                                   
+  availability_zone = "us-east-2a"                        
+}
+resource "aws_default_subnet" "default_1b" {                                   
+  availability_zone = "us-east-2b"                        
+}
+
+resource "aws_default_subnet" "default_1c" {                                   
+  availability_zone = "us-east-2c"                        
+}
+
+*/
 
 // Create the Security Group which will be used for the EC2 instances launched by the auto-scaling group
 resource "aws_security_group" "ec2_sg" {
   name = "ANDdig_WebTier_sg"
 
   ingress {
-    from_port   = 443 
-    to_port     = 443 
+    from_port   = 80 
+    to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = var.whitelist[for_https] 
+    cidr_blocks = var.whitelist["for_http"] 
   }
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = var.whitelist[for_ssh] 
+    cidr_blocks = var.whitelist["for_ssh"] 
   }
 }
 
 // Create the Launch Configuration which will determine how new EC2 instances are launched
 resource "aws_launch_configuration" "ec2_lc" {
-  name_prefix     = "web_tier_lc-"
-  image_id        = "ami-04b9e92b5572fa0d1"
-  instance_type   = "t2.nano" 
+  name_prefix     = "web-"
+  image_id        = "ami-0fc20dd1da406780b"
+  instance_type   = "t2.micro" 
   security_groups = [aws_security_group.ec2_sg.id]
-  key_name        = private_key_name
 
   // the following commands will run when an instance is bootstrapped
   user_data       = file("install_apache.sh")
@@ -64,16 +144,16 @@ resource "aws_launch_configuration" "ec2_lc" {
 resource "aws_autoscaling_group" "ec2_asg" {
   name		       = "ANDdig_WebTier-asg"
   launch_configuration = aws_launch_configuration.ec2_lc.id
-  availability_zones   = ["us-east-1a","us-east-1b","us-east-1c"]
-  vpc_zone_identifier  = [var.ec2_asg_props.zone_list]
+  availability_zones   = var.availability_zones
+  vpc_zone_identifier  = [
+                           aws_subnet.public_us_east_2a.id,
+                           aws_subnet.public_us_east_2b.id,
+                           aws_subnet.public_us_east_2c.id
+			 ] 
   min_size             = var.min_web_instances
   max_size             = var.max_web_instances
-  load_balancers       = aws_elb.elb_lb.name
+  load_balancers       = [aws_elb.elb_lb.name]
   health_check_type    = "ELB"
-
-  tags {
-    functinal_grouping = "WebTier"
-  }
 }
 
 
@@ -89,10 +169,10 @@ resource "aws_security_group" "elb_sg" {
   }
 
   ingress {
-    from_port   = 443 
-    to_port     = 443 
+    from_port   = 80
+    to_port     = 80
     protocol    = "tcp"
-    cidr_blocks = var.whitelist[for_https]
+    cidr_blocks = var.whitelist["for_http"]
   }
 }
 
@@ -100,9 +180,10 @@ resource "aws_security_group" "elb_sg" {
 
 // Creating the ELB
 resource "aws_elb" "elb_lb" {
-  name_prefix        = "ANDdig_elb-"
+  name               = "ANDdig-elb"
   security_groups    = [aws_security_group.elb_sg.id]
-  availability_zones = [data.aws_availability_zones.all.names]
+  availability_zones = var.availability_zones
+
 
   health_check {
     healthy_threshold   = 2
@@ -113,13 +194,13 @@ resource "aws_elb" "elb_lb" {
   }
 
   listener {
-    lb_port           = 443 
-    lb_protocol       = "https"
-    instance_port     = "443"
-    instance_protocol = "https"
+    lb_port           = 80 
+    lb_protocol       = "http"
+    instance_port     = 80 
+    instance_protocol = "http"
   }
 
-  tags {
+  tags = {
     functional_group = "WebTier"
   }
 
