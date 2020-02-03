@@ -63,50 +63,6 @@ resource "aws_subnet" "public_us_east_2c" {
   }
 }
 
-/*
-resource "aws_subnet" "default_1a" {
-  vpc_id     = aws_vpc.my_vpc.id
-  cidr_block = "172.32.3.0/28"
-  availability_zone = "us-east-2a"
-
-  tags = {
-    Name = "Public Subnet us-east-2a"
-  }
-}
-
-resource "aws_subnet" "default_1b" {
-  vpc_id     = aws_vpc.my_vpc.id
-  cidr_block = "172.32.4.0/28"
-  availability_zone = "us-east-2b"
-
-  tags = {
-    Name = "Public Subnet us-east-2b"
-  }
-}
-
-resource "aws_subnet" "default_1c" {
-  vpc_id     = aws_vpc.my_vpc.id
-  cidr_block = "172.32.5.0/28"
-  availability_zone = "us-east-2c"
-
-  tags = {
-    Name = "Public Subnet us-east-2c"
-  }
-}
-
-resource "aws_default_subnet" "default_1a" {                                   
-  availability_zone = "us-east-2a"                        
-}
-resource "aws_default_subnet" "default_1b" {                                   
-  availability_zone = "us-east-2b"                        
-}
-
-resource "aws_default_subnet" "default_1c" {                                   
-  availability_zone = "us-east-2c"                        
-}
-
-*/
-
 // Create the Security Group which will be used for the EC2 instances launched by the auto-scaling group
 resource "aws_security_group" "ec2_sg" {
   name = "ANDdig_WebTier_sg"
