@@ -33,6 +33,42 @@ resource "aws_vpc" "my_vpc" {
   }
 }
 
+resource "aws_internet_gateway" "my_vpc_igw" {
+  vpc_id = aws_vpc.my_vpc.id
+
+  tags = {
+    Name = "My VPC - Internet Gateway"
+  }
+}
+
+resource "aws_route_table" "my_vpc_public" {
+    vpc_id = aws_vpc.my_vpc.id
+
+    route {
+        cidr_block = "0.0.0.0/0"
+        gateway_id = aws_internet_gateway.my_vpc_igw.id
+    }
+
+    tags = {
+        Name = "Public Subnets Route Table for My VPC"
+    }
+}
+
+resource "aws_route_table_association" "my_vpc_us_east_2a_public" {
+    subnet_id = aws_subnet.public_us_east_2a.id
+    route_table_id = aws_route_table.my_vpc_public.id
+}
+
+resource "aws_route_table_association" "my_vpc_us_east_2b_public" {
+    subnet_id = aws_subnet.public_us_east_2b.id
+    route_table_id = aws_route_table.my_vpc_public.id
+}
+
+resource "aws_route_table_association" "my_vpc_us_east_2c_public" {
+    subnet_id = aws_subnet.public_us_east_2c.id
+    route_table_id = aws_route_table.my_vpc_public.id
+}
+
 resource "aws_subnet" "public_us_east_2a" {
   vpc_id     = aws_vpc.my_vpc.id
   cidr_block = "172.32.0.0/28"
@@ -56,7 +92,7 @@ resource "aws_subnet" "public_us_east_2b" {
 resource "aws_subnet" "public_us_east_2c" {
   vpc_id     = aws_vpc.my_vpc.id
   cidr_block = "172.32.2.0/28"
-  availability_zone = "us-east-2b"
+  availability_zone = "us-east-2c"
 
   tags = {
     Name = "Public Subnet us-east-2c"
@@ -131,7 +167,7 @@ resource "aws_instance" "test_web_2c" {
 // Create the Security Group for the elastic load balancer instance 
 resource "aws_security_group" "elb_sg" {
   name_prefix = "ANDdig_elb_sg-"
-  vpc_id      = aws_vpc.my_vpc.id
+  vpc_id = aws_vpc.my_vpc.id
 
   egress {
     from_port   = 0
@@ -159,8 +195,11 @@ resource "aws_elb" "elb_lb" {
 			aws_instance.test_web_2b.id,
 			aws_instance.test_web_2c.id
 		       ]
-  availability_zones = var.availability_zones
-
+  subnets 	     = [
+			aws_subnet.public_us_east_2a.id,
+			aws_subnet.public_us_east_2b.id,
+			aws_subnet.public_us_east_2c.id
+		       ]
 
   health_check {
     healthy_threshold   = 2
